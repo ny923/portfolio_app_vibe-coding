@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { supabase } from '../lib/supabase';
 // Recharts グラフ用
 import { PieChart, Pie, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
-// forログイン機能
+// ログイン機能用
 import { User } from '@supabase/supabase-js';
 
 // 1. TypeScriptの型定義（APIから返ってくるJSONの構造を定義）
@@ -16,7 +16,7 @@ interface ReceiptItem {
     price: number;
     category: string;
 }
-// レシート内の合計、情報など
+// レシート1件分のデータ（合計金額・店舗名・品目リスト）
 interface ReceiptData {
     date: string;
     totalAmount: number;
@@ -63,10 +63,10 @@ const COLORS: Record<string, string> = {
 };
 
 export default function Home() {
-    //状態定義 for login >(初期値) 状態が変わると該当部分だけが自動で再描画
+    // 状態定義（状態が変わると該当部分だけが自動で再描画）
     // ↓ [現在の状態, その状態を更新するための関数]
     const [user, setUser] = useState<User | null>(null);
-    // アカウント持ちか、無ければ新規
+    // ログインか新規登録かの切り替え
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
     const [authError, setAuthError] = useState<string | null>(null);
     const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export default function Home() {
 
     // すべてのデータをSupabaseから取得して各種整形する関数
     const loadAllData = useCallback(async () => {
-        if (!user) return; // ログインしていなければ終
+        if (!user) return; // ログインしていなければ終了
 
         try {
             // 1. 過去のレシート履歴を全件取得（日付が新しい順）
@@ -146,7 +146,7 @@ export default function Home() {
                 .order('purchase_date', { ascending: false });
             if (rError) throw rError;
 
-            // 2. 月ごとの支出推移（折れ線グラフ用）のデータ整形
+            // 2. 履歴データの整形（日別・月別）
             if (receiptsData) {
                 // 日ごと r→ﾚｼ-ﾄのr
                 const dailyMap: { [date: string]: DailyHistory } = {};
@@ -193,7 +193,6 @@ export default function Home() {
                     month,
                     days: monthlyMap[month]
                 }));
-                // stateにセット(保存)
                 setMonthlyHistory(formattedMonthlyHistory);
 
                 // カレンダーで現在選択中の日のデータも最新化する
@@ -202,11 +201,11 @@ export default function Home() {
                 }
             }
 
-            // 2. 折れ線グラフ用データ整形 acc>accumulate(蓄積)の略
+            // 3. 折れ線グラフ用データ整形（acc は accumulate の略）
             if (receiptsData) {
                 // 日付（YYYY-MM-DD）から YYYY年MM月 の形にして集計  reduce()配列の要素を単一の値にまとめる
                 const monthlyAggregated = receiptsData.reduce((acc: { [key: string]: number }, r) => {
-                    // 184行目と同じ
+                    // 上と同じ月文字列への変換
                     const month = r.purchase_date.substring(0, 7).replace('-', '年') + '月';
                     acc[month] = (acc[month] || 0) + r.total_amount;
                     return acc;
@@ -220,8 +219,8 @@ export default function Home() {
             }
 
             // 円グラフ用データの取得（表示中のカレンダーの月に合わせる）
-            const year = currentDate.getFullYear();// 年を4桁の数値で取得
-            const month = currentDate.getMonth() + 1; //月取得
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1;
             const formatZero = (num: number) => String(num).padStart(2, '0');
             const startOfMonth = `${year}-${formatZero(month)}-01`;
             const lastDay = new Date(year, month, 0).getDate();
@@ -235,7 +234,7 @@ export default function Home() {
                     category,
                     receipts!inner(purchase_date)
                 `)
-                // 今月分だけを絞り込む zod
+                // 今月分だけを絞り込む
                 .gte('receipts.purchase_date', startOfMonth) //~以上
                 .lte('receipts.purchase_date', endOfMonth); //~以下
 
@@ -275,7 +274,6 @@ export default function Home() {
         }
     }, [user, refreshCounter, currentDate]);
     // ログインユーザーが変わったら再取得
-    //, [user, refreshCounter, currentDate]
 
     useEffect(() => {
         // ↓のエラーは「偽陽性」無視でok
@@ -308,7 +306,6 @@ export default function Home() {
 
     // フォームが送信された時、引数にブラウザから送信された formData が自動で入ってきます。
     const handleFormAction = async (formData: FormData) => {
-        // AJAX等にデータを送るときと同じように FormData を作ります
         const file = formData.get('image') as File | null;
         if (!file || file.size === 0) return; // ファイルが空なら処理しない
         if (!user) return; // ログインガード
@@ -320,13 +317,11 @@ export default function Home() {
             // バックエンドに「誰のレシートか」を伝えるために、ユーザーIDをフォームデータに仕込みます
             formData.append('userId', user.id);
 
-            // Next.js の API エンドポイント
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 body: formData,
             });
             if (!response.ok) throw new Error();
-            // データの受け取り
             const data: ReceiptData = await response.json();
             setResult(data);
             // 保存が成功したので、グラフデータを再読み込みして画面を同期
@@ -339,7 +334,6 @@ export default function Home() {
     };
 
     // 手動入力の送信ロジック（フロントから直接Supabaseへ）
-    //async (formData: FormData)
     const handleManualSubmit = async () => {
         if (!user || !manualShop) return;
 
@@ -902,4 +896,3 @@ export default function Home() {
         </main>
     );
 }
-// end of code
