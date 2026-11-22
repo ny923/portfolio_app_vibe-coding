@@ -13,7 +13,7 @@ export const metadata: Metadata = {
         siteName: "AIレシート家計簿",
         images: [
             {
-                url: "https://kakeibo-app-brown.vercel.app/ogp.jpg", // 絶対パス（http/httpsから始まるURL）
+                url: "https://kakeibo-app-brown.vercel.app/ogp.jpg", // 絶対URL（http/httpsから始まるURL）
                 width: 1200,
                 height: 630,
                 alt: "AIレシート家計簿",

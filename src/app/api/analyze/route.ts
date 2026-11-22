@@ -45,7 +45,6 @@ export async function POST(req: Request) {
         // 4. Vercel AI SDK を使って Gemini API を呼び出し、画像を解析
         const { output: receiptData } = await generateText({
             model: google('gemini-2.5-flash'), // 高速かつ画像認識が得意な無料枠のあるモデル
-            // output プロパティに Output.object を指定し、スキーマを渡す
             output: Output.object({ schema: receiptSchema }),
             messages: [
                 {
